@@ -69,7 +69,6 @@ def _generate_config(val_dict):
         'secret_access_key': val_dict['secret_access_key'],
         'region': val_dict['region'],
         'queue_name': val_dict['store_name'],
-        'bucket_name': val_dict['bucket_name'],
     }
     cfg[PRINTER_CONFIG_SECTION] = {
         'interval': val_dict['interval'],
@@ -116,9 +115,8 @@ def _send_jobs_to_printer():
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
     s3 = _get_aws_session().resource('s3')
     for job in _jobs():
-        print(job['s3_location'])
-        file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['s3_location']))
-        s3.Bucket(CONFIG[AWS_CONFIG_SECTION]['bucket_name']).download_file(job['s3_location'], file_to_print)
+        file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['s3_key']))
+        s3.Bucket(CONFIG[AWS_CONFIG_SECTION]['s3_bucket']).download_file(job['s3_key'], file_to_print)
         _print_file(file_to_print)
 
 
@@ -133,8 +131,6 @@ def cli():
 @click.option('--secret-access-key', help='AWS Secret access key', required=True, prompt=True,
               default=CONFIG[AWS_CONFIG_SECTION].get('secret_access_key', ''))
 @click.option('--region', help="AWS region", default=CONFIG[AWS_CONFIG_SECTION].get('region', 'us-east-1'), prompt=True)
-@click.option('--bucket-name', help='S3 bucket name', required=True, prompt=True,
-              default=CONFIG[AWS_CONFIG_SECTION].get('bucket_name', 'svo-print-jobs'))
 @click.option('--interval', help='Sets the frequency for polling the job queue', show_default=True, prompt=True,
               default=CONFIG[PRINTER_CONFIG_SECTION].get('interval', '30s')
               )
@@ -143,7 +139,7 @@ def cli():
 @click.option('--printer-name', help='Name of your network printer', required=True, prompt=True,
               default=CONFIG[PRINTER_CONFIG_SECTION].get('printer_name', _get_available_printers()[0]),
               type=click.Choice(_get_available_printers()))
-def setup(access_key, secret_access_key, region, bucket_name, interval, store_name, printer_name):
+def setup(access_key, secret_access_key, region, interval, store_name, printer_name):
     """Setup the printing application """
     _interval = timeparse(interval)
     if _interval is not None:
@@ -151,7 +147,6 @@ def setup(access_key, secret_access_key, region, bucket_name, interval, store_na
     config_vals = dict(
         access_key=access_key,
         secret_access_key=secret_access_key,
-        bucket_name=bucket_name,
         region=region,
         interval=interval,
         store_name=store_name,
