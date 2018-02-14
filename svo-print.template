@@ -1,0 +1,74 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "htmlToPDFLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "svo-print",
+          "S3Key": "lambda_code/html-to-pdf.zip"
+        },
+        "Handler": "index.handler",
+        "Runtime": "nodejs6.10",
+        "Role": {"Fn::GetAtt": ["svoPrintRole", "Arn"]},
+        "FunctionName": "html-to-pdf",
+        "MemorySize": 128,
+        "Timeout": 15
+      },
+      "DependsOn": [
+        "svoPrintRole"
+      ]
+    },
+    "svoPrintPolicy": {
+      "DependsOn": [
+        "svoPrintRole"
+      ],
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "svoPrintRolePolicy",
+        "Roles": [
+          {"Ref": "svoPrintRole"}
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "logs:*",
+              "Resource": ["arn:aws:logs:*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "s3:*"
+              ],
+              "Resource": [
+                "arn:aws:s3:::svo-print",
+                "arn:aws:s3:::svo-print/*"
+              ]
+            }
+          ]
+        }
+      }
+
+    },
+    "svoPrintRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["lambda.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Path": "/"
+      }
+    }
+  }
+}

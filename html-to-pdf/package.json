@@ -1,0 +1,19 @@
+{
+  "name": "zeplin-html-to-pdf",
+  "version": "0.2.2",
+  "description": "AWS Lambda function that converts HTML pages to PDF documents",
+  "scripts": {
+    "test": "node local/index.js",
+    "pack": "rm -f html-to-pdf.zip && zip html-to-pdf.zip -r index.js wkhtmltopdf utils"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zeplin/zeplin-html-to-pdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zeplin/zeplin-html-to-pdf/issues"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.191.0"
+  }
+}
