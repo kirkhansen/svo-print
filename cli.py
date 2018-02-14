@@ -3,15 +3,15 @@ import json
 import os
 import configparser
 import tempfile
-from time import sleep
 import subprocess
 
 import boto3
 import click
 from crontab import CronTab
-from pytimeparse.timeparse import timeparse
+from pidfile import PIDFile
 
-# TODO: Typically, these should be in other modules, but I'm not sure how that will work with Pyinstaller.
+# TODO: Typically, a lot of this code would be split out into several modules,
+# but I'm not sure how that will work with Pyinstaller.
 # Try it out so this code is more maintainable.
 
 APP_NAME = "svo-print"
@@ -19,6 +19,7 @@ AWS_CONFIG_SECTION = 'AWS'
 PRINTER_CONFIG_SECTION = 'PRINTER'
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
+PID_FILE = os.path.join(os.path.dirname((os.path.abspath(__file__))), '.cli-pid')
 
 CLI_WARN = 'yellow'
 CLI_ERROR = 'red'
@@ -71,7 +72,6 @@ def _generate_config(val_dict):
         'queue_name': val_dict['store_name'],
     }
     cfg[PRINTER_CONFIG_SECTION] = {
-        'interval': val_dict['interval'],
         'cmd': '{} run'.format(os.path.abspath(__file__)),
         'printer_name': val_dict['printer_name'],
     }
@@ -81,14 +81,17 @@ def _generate_config(val_dict):
 
 
 def _schedule():
-    """ Setups up a cron job to make sure this thing is alive. Run this every minute (* * * *) """
+    """
+    Setups up a cron job to make sure the print job process is running. Run this every minute (* * * *).
+    Also sets up the apscheduler to make sure the code is only running on weekdays during work hours.
+    """
     crontab = CronTab(user=getpass.getuser())
     try:
         job = next(crontab.find_comment('print-job'))
     except StopIteration:
         job = crontab.new(comment='print-job')
     job.command = CONFIG[PRINTER_CONFIG_SECTION]['cmd']
-    job.minute.every(1)
+    job.setall('* 8-17 * * 1-5')
     crontab.write()
 
 
@@ -100,7 +103,7 @@ def _print_file(file_to_print):
 def _jobs():
     session = _get_aws_session()
     sqs = session.resource('sqs')
-    queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'])
+    queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'], ReceiveMessageWaitTime=20)
     for message in queue.receive_messages():
         try:
             yield json.loads(message.body)
@@ -131,24 +134,17 @@ def cli():
 @click.option('--secret-access-key', help='AWS Secret access key', required=True, prompt=True,
               default=CONFIG[AWS_CONFIG_SECTION].get('secret_access_key', ''))
 @click.option('--region', help="AWS region", default=CONFIG[AWS_CONFIG_SECTION].get('region', 'us-east-1'), prompt=True)
-@click.option('--interval', help='Sets the frequency for polling the job queue', show_default=True, prompt=True,
-              default=CONFIG[PRINTER_CONFIG_SECTION].get('interval', '30s')
-              )
 @click.option('--store-name', help='Name of your store', required=True, prompt=True,
               default=CONFIG[AWS_CONFIG_SECTION].get('queue_name', ''))
 @click.option('--printer-name', help='Name of your network printer', required=True, prompt=True,
               default=CONFIG[PRINTER_CONFIG_SECTION].get('printer_name', _get_available_printers()[0]),
               type=click.Choice(_get_available_printers()))
-def setup(access_key, secret_access_key, region, interval, store_name, printer_name):
+def setup(access_key, secret_access_key, region, store_name, printer_name):
     """Setup the printing application """
-    _interval = timeparse(interval)
-    if _interval is not None:
-        interval = _interval
     config_vals = dict(
         access_key=access_key,
         secret_access_key=secret_access_key,
         region=region,
-        interval=interval,
         store_name=store_name,
         printer_name=printer_name,
     )
@@ -159,10 +155,9 @@ def setup(access_key, secret_access_key, region, interval, store_name, printer_n
 @cli.command()
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
-    cfg = _get_config()
-    while True:
+    # Let's just allow a single process to be running at a time.
+    with PIDFile(PID_FILE):
         _send_jobs_to_printer()
-        sleep(cfg[PRINTER_CONFIG_SECTION].getint('interval'))
 
 
 if __name__ == '__main__':

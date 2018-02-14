@@ -14,10 +14,9 @@ function callback(err, result) {
         console.error(err);
         return;
     }
-
     fs.writeFileSync(outputFile, new Buffer(result.data, "base64"));
 }
 
 fs.readFile(inputFile, function (err, data) {
-    htmlToPdf.handler({ html: data.toString() }, null, callback);
+    htmlToPdf.handler({ html: data.toString(), bucket: 'test', key: 'test.pdf'}, null, callback);
 });

@@ -3,3 +3,4 @@ build/*
 dist/*
 cli.spec
 *__pycache__/
+*.pdf
