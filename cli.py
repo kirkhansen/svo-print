@@ -1,5 +1,6 @@
 import getpass
 import json
+import logging.config
 import os
 import configparser
 import tempfile
@@ -27,6 +28,16 @@ CLI_SUCCESS = 'green'
 CLI_INFO = 'blue'
 
 
+def setup_logging(default_path='logging.json', default_level=logging.INFO, env_key='LOG_CFG'):
+    path = os.getenv(env_key, default_path)
+    try:
+        with open(path, 'r') as f:
+            config = json.load(f)
+        logging.config.dictConfig(config)
+    except FileNotFoundError:
+        logging.basicConfig(level=default_level)
+
+
 def _get_config():
     if not os.path.exists(click.get_app_dir(APP_NAME)):
         os.makedirs(click.get_app_dir(APP_NAME), exist_ok=True)
@@ -46,6 +57,7 @@ CONFIG = _get_config()
 
 
 def _get_aws_session():
+    logging.debug("Getting s3 session")
     session = boto3.Session(
         aws_access_key_id=CONFIG[AWS_CONFIG_SECTION]['access_key'],
         aws_secret_access_key=CONFIG[AWS_CONFIG_SECTION]['secret_access_key'],
@@ -55,10 +67,12 @@ def _get_aws_session():
 
 
 def _get_available_printers():
+    logging.debug("Searching for printers")
     lpstat = subprocess.Popen(['lpstat', '-a'], stdout=subprocess.PIPE)
     printers = subprocess.check_output(['cut', '-f1', '-d',  ' '], stdin=lpstat.stdout).split()
     lpstat.wait()
     printers = [str(printer, 'utf-8') for printer in printers]
+    logging.debug("Found {} printers".format(",".join(printers)))
     return printers
 
 
@@ -82,13 +96,15 @@ def _generate_config(val_dict):
 
 def _schedule():
     """
-    Setups up a cron job to make sure the print job process is running. Run this every minute (* * * *).
-    Also sets up the apscheduler to make sure the code is only running on weekdays during work hours.
+    Setups up a cron job to make sure the print job process is running. Run this every minute
+    on workdays between 8am and 5pm
     """
     crontab = CronTab(user=getpass.getuser())
     try:
         job = next(crontab.find_comment('print-job'))
+        logging.info('Cron exists. Updating.')
     except StopIteration:
+        logging.info('Adding new cron job.')
         job = crontab.new(comment='print-job')
     job.command = CONFIG[PRINTER_CONFIG_SECTION]['cmd']
     job.setall('* 8-17 * * 1-5')
@@ -108,18 +124,18 @@ def _jobs():
         try:
             yield json.loads(message.body)
         except Exception:
-            # TODO: log the exception somewhere
-            pass
+            logging.exception("Error occured trying to print {}".format(message.body), exc_info=True)
         else:
             message.delete()
 
 
-def _send_jobs_to_printer():
+def _send_jobs_to_printer(s3):
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
-    s3 = _get_aws_session().resource('s3')
     for job in _jobs():
         file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['s3_key']))
+        logging.debug("Fetching {} from s3".format(file_to_print))
         s3.Bucket(CONFIG[AWS_CONFIG_SECTION]['s3_bucket']).download_file(job['s3_key'], file_to_print)
+        logging.debug("Printing {}".format(file_to_print))
         _print_file(file_to_print)
 
 
@@ -140,7 +156,10 @@ def cli():
               default=CONFIG[PRINTER_CONFIG_SECTION].get('printer_name', _get_available_printers()[0]),
               type=click.Choice(_get_available_printers()))
 def setup(access_key, secret_access_key, region, store_name, printer_name):
-    """Setup the printing application """
+    """
+    Setup the printing application. You may pass in the variables from the commandline directly, or
+    omit them, and enter them via the wizard prompt.
+    """
     config_vals = dict(
         access_key=access_key,
         secret_access_key=secret_access_key,
@@ -156,9 +175,14 @@ def setup(access_key, secret_access_key, region, store_name, printer_name):
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
     # Let's just allow a single process to be running at a time.
+    attempts = 2
+    s3 = _get_aws_session().resource('s3')
     with PIDFile(PID_FILE):
-        _send_jobs_to_printer()
+        while attempts > 0:
+            _send_jobs_to_printer(s3)
+            attempts -= 1
 
 
 if __name__ == '__main__':
+    setup_logging(default_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json'))
     cli()
