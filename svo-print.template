@@ -1,5 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The stack for the svoapp printing backend.",
   "Parameters": {
     "visibilityTimeout": {
       "Type": "Number",
