@@ -9,7 +9,6 @@ import subprocess
 import boto3
 import click
 from crontab import CronTab
-from pidfile import PIDFile
 
 # TODO: Typically, a lot of this code would be split out into several modules,
 # but I'm not sure how that will work with Pyinstaller.
@@ -191,10 +190,9 @@ def run():
     # Let's just allow a single process to be running at a time.
     attempts = 2
     s3 = _get_aws_session().resource('s3')
-    with PIDFile(PID_FILE):
-        while attempts > 0:
-            _send_jobs_to_printer(s3)
-            attempts -= 1
+    while attempts > 0:
+        _send_jobs_to_printer(s3)
+        attempts -= 1
 
 
 if __name__ == '__main__':

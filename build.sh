@@ -2,7 +2,7 @@
 
 set -e
 
-pyinstaller -y cli.py
+pyinstaller -y cli.spec
 pushd dist
 tar -czf cli.tar.gz cli
 popd
