@@ -86,27 +86,31 @@ def _generate_config(val_dict):
         'queue_name': val_dict['store_name'],
     }
     cfg[PRINTER_CONFIG_SECTION] = {
-        'cmd': '{} run'.format(os.path.abspath(__file__)),
+        'executable': val_dict['executable_path'],
+        'cmd': 'cli run',
         'printer_name': val_dict['printer_name'],
     }
 
     with open(CONFIG_FILE, 'w') as config_file:
         cfg.write(config_file)
+    return cfg
 
 
-def _schedule():
+def _schedule(config):
     """
     Setups up a cron job to make sure the print job process is running. Run this every minute
     on workdays between 8am and 5pm
     """
     crontab = CronTab(user=getpass.getuser())
+    cmd = "{}/{}".format(config[PRINTER_CONFIG_SECTION]['executable'], config[PRINTER_CONFIG_SECTION]['cmd'])
     try:
         job = next(crontab.find_comment('print-job'))
         logging.info('Cron exists. Updating.')
+        job.command = cmd
     except StopIteration:
         logging.info('Adding new cron job.')
-        job = crontab.new(comment='print-job')
-    job.command = CONFIG[PRINTER_CONFIG_SECTION]['cmd']
+        crontab.new(comment='print-job', command=cmd)
+        job = next(crontab.find_comment('print-job'))
     job.setall('* 8-17 * * 1-5')
     crontab.write()
 
@@ -119,10 +123,16 @@ def _print_file(file_to_print):
 def _jobs():
     session = _get_aws_session()
     sqs = session.resource('sqs')
-    queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'], ReceiveMessageWaitTime=20)
-    for message in queue.receive_messages():
+    queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'])
+    for message in queue.receive_messages(WaitTimeSeconds=20):
         try:
-            yield json.loads(message.body)
+            records = json.loads(message.body)['Records']
+            for record in records:
+                s3_record = dict(
+                    key=record['s3']['object']['key'],
+                    bucket=record['s3']['bucket']['name']
+                )
+                yield s3_record
         except Exception:
             logging.exception("Error occured trying to print {}".format(message.body), exc_info=True)
         else:
@@ -132,9 +142,9 @@ def _jobs():
 def _send_jobs_to_printer(s3):
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
     for job in _jobs():
-        file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['s3_key']))
+        file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['key']))
         logging.debug("Fetching {} from s3".format(file_to_print))
-        s3.Bucket(CONFIG[AWS_CONFIG_SECTION]['s3_bucket']).download_file(job['s3_key'], file_to_print)
+        s3.Bucket(job['bucket']).download_file(job['key'], file_to_print)
         logging.debug("Printing {}".format(file_to_print))
         _print_file(file_to_print)
 
@@ -155,7 +165,10 @@ def cli():
 @click.option('--printer-name', help='Name of your network printer', required=True, prompt=True,
               default=CONFIG[PRINTER_CONFIG_SECTION].get('printer_name', _get_available_printers()[0]),
               type=click.Choice(_get_available_printers()))
-def setup(access_key, secret_access_key, region, store_name, printer_name):
+@click.option('--executable-path', help='Path to where you unzipped this program', required=True, prompt=True,
+              type=click.Path(exists=True, dir_okay=True, file_okay=False),
+              default=CONFIG[PRINTER_CONFIG_SECTION].get('executable', os.getcwd()))
+def setup(access_key, secret_access_key, region, store_name, printer_name, executable_path):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
     omit them, and enter them via the wizard prompt.
@@ -166,9 +179,10 @@ def setup(access_key, secret_access_key, region, store_name, printer_name):
         region=region,
         store_name=store_name,
         printer_name=printer_name,
+        executable_path=executable_path,
     )
-    _generate_config(config_vals)
-    _schedule()
+    config = _generate_config(config_vals)
+    _schedule(config)
 
 
 @cli.command()

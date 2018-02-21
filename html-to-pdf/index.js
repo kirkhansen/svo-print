@@ -9,7 +9,7 @@ function putObjectToS3(event, buffer, callback){
     let params = {
         Bucket: event.bucket,
         Key: event.key,
-        Body: buffer.toString("base64")
+        Body: buffer
     };
     s3.putObject(params, function(err, data){
         if (err) {

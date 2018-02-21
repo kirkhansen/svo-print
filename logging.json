@@ -38,14 +38,14 @@
 
     "loggers": {
         "cli": {
-            "level": "ERROR",
+            "level": "INFO",
             "handlers": ["info_file_handler", "error_file_handler"],
             "propagate": "no"
         }
     },
 
     "root": {
-        "level": "INFO",
+        "level": "DEBUG",
         "handlers": ["console", "info_file_handler", "error_file_handler"]
     }
 }
