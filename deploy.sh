@@ -12,6 +12,9 @@ then
     # make sure we have the latest python code built, and npm code for lambda is up to date
     ./build.sh
 
+    # Update the cli code.
+    aws --profile=${AWS_PROFILE} s3 cp "${DIR}/dist/cli.tar.gz" s3://svo-print-config/cli.tar.gz
+
     # Update the lambda code
     aws --profile=${AWS_PROFILE} s3 cp "${DIR}/html-to-pdf/html-to-pdf.zip" s3://svo-print-config/lambda_code/
     aws --profile=${AWS_PROFILE} lambda update-function-code --region=us-east-1 \
