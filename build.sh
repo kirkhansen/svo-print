@@ -2,9 +2,9 @@
 
 set -e
 
-pyinstaller -y cli.spec
+pyinstaller -y svo-print.spec
 pushd dist
-zip -r cli.zip cli
+zip -r svo-print.zip svo-print
 popd
 
 pushd html-to-pdf

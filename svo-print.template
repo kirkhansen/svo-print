@@ -16,7 +16,7 @@
     }
   },
   "Resources": {
-    "htmlToPDFLambdba": {
+    "htmlToPDFLambda": {
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
@@ -149,7 +149,7 @@
   },
   "Outputs": {
     "svoPrintRole": {"Value": {"Ref": "svoPrintRole"}},
-    "htmlToPDFLambdba": {"Value": {"Ref": "htmlToPDFLambdba"}},
+    "htmlToPDFLambda": {"Value": {"Ref": "htmlToPDFLambda"}},
     "s3Bucket": {"Value": {"Ref": "svoPrintS3"}}
   }
 }
