@@ -116,7 +116,11 @@ def _schedule(config):
 
 def _print_file(file_to_print):
     """ Send the job to the printer. This assumes Mac or Unix like system where lpr exists."""
-    subprocess.check_call(['lpr', '-P', CONFIG[PRINTER_CONFIG_SECTION]['printer_name'], file_to_print])
+    subprocess.check_call([
+        'lpr',
+        '-P', CONFIG[PRINTER_CONFIG_SECTION]['printer_name'],
+        '-o', 'fit-to-page',
+        file_to_print])
 
 
 def _jobs():

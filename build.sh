@@ -4,7 +4,7 @@ set -e
 
 pyinstaller -y cli.spec
 pushd dist
-tar -czf cli.tar.gz cli
+zip -r cli.zip cli
 popd
 
 pushd html-to-pdf

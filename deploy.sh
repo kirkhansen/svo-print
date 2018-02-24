@@ -13,7 +13,7 @@ then
     ./build.sh
 
     # Update the cli code.
-    aws --profile=${AWS_PROFILE} s3 cp "${DIR}/dist/cli.tar.gz" s3://svo-print-config/cli.tar.gz
+    aws --profile=${AWS_PROFILE} s3 cp "${DIR}/dist/cli.zip" s3://svo-print-config/cli.zip
 
     # Update the lambda code
     aws --profile=${AWS_PROFILE} s3 cp "${DIR}/html-to-pdf/html-to-pdf.zip" s3://svo-print-config/lambda_code/
