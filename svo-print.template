@@ -97,7 +97,6 @@
               "Event": "s3:ObjectCreated:*",
               "Filter": {"S3Key": {"Rules": [{"Name": "prefix", "Value": "test-svo-print-store/"}]}},
               "Queue": {"Fn::GetAtt": ["testStoreQueue", "Arn"]}
-
             }
           ]
         }
@@ -135,7 +134,9 @@
               "Action": [
                 "SQS:SendMessage"
               ],
-              "Resource": {"Fn::GetAtt": ["testStoreQueue", "Arn"]},
+              "Resource": [
+                {"Fn::GetAtt": ["testStoreQueue", "Arn"]}
+              ],
               "Condition": {
                 "ArnLike": {
                   "aws:SourceArn": {"Fn::Join": ["", ["arn:aws:s3:*:*:", {"Ref": "bucketName"}]]}

@@ -62,6 +62,8 @@ There are several ways to handle the access key stuff. The first few that come t
    how to get going.
 
 ## Additional notes
+
+### Starting the print process
 [invoking lambda from ruby](https://docs.aws.amazon.com/sdk-for-ruby/v3/developer-guide/lambda-ruby-example-run-function.html)
 
 To start the print process, the rails app will have to use the aws ruby sdk to
@@ -82,3 +84,22 @@ that looks like
 You could get the function name from calling cloudformation,
 or read the value from a config file,
 or just hard-code `html-to-pdf` since that won't change.
+
+
+### Adding store queues in Cloudformation
+
+1. Add a new queue resource (similar to the `testStoreQueue`)
+2. Update the `svoPrintS3` resource
+    * Add another block under the `QueueConfigurations` like
+    ```
+    {
+      "Event": "s3:ObjectCreated:*",
+      "Filter": {"S3Key": {"Rules": [{"Name": "prefix", "Value": "newStoreId/"}]}},
+      "Queue": {"Fn::GetAtt": ["resourceOfNewQueue", "Arn"]}
+    }
+    ```
+    * Add your new queue resource name to the `DependsOn` key.
+3. Update the `svoQueuePolicy`
+    * Add your new queue resource name to the `DependsOn` key.
+    * Update the `Queues` key to have another block like `{"Ref": "resourceOfNewQueue"}`
+    * Update the `Resource` key and add another `{"Fn::GetAtt": ["resourceOfNewQueue", "Arn"]}`
