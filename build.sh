@@ -4,7 +4,7 @@ set -e
 
 pyinstaller -y svo-print.spec
 pushd dist
-zip -r svo-print.zip svo-print
+zip -FSr svo-print.zip svo-print
 popd
 
 pushd html-to-pdf

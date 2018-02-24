@@ -19,7 +19,6 @@ AWS_CONFIG_SECTION = 'AWS'
 PRINTER_CONFIG_SECTION = 'PRINTER'
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
-PID_FILE = os.path.join(os.path.dirname((os.path.abspath(__file__))), '.cli-pid')
 
 CLI_WARN = 'yellow'
 CLI_ERROR = 'red'
@@ -86,7 +85,7 @@ def _generate_config(val_dict):
     }
     cfg[PRINTER_CONFIG_SECTION] = {
         'executable': val_dict['executable_path'],
-        'cmd': 'cli run',
+        'cmd': 'svo-print run',
         'printer_name': val_dict['printer_name'],
     }
 
