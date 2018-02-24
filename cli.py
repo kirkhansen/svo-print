@@ -123,7 +123,7 @@ def _jobs():
     session = _get_aws_session()
     sqs = session.resource('sqs')
     queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'])
-    for message in queue.receive_messages(WaitTimeSeconds=20):
+    for message in queue.receive_messages(WaitTimeSeconds=19):
         try:
             records = json.loads(message.body)['Records']
             for record in records:
@@ -188,7 +188,7 @@ def setup(access_key, secret_access_key, region, store_name, printer_name, execu
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
     # Let's just allow a single process to be running at a time.
-    attempts = 2
+    attempts = 3
     s3 = _get_aws_session().resource('s3')
     while attempts > 0:
         _send_jobs_to_printer(s3)
