@@ -69,7 +69,7 @@ def _get_available_printers():
     lpstat = subprocess.Popen(['lpstat', '-a'], stdout=subprocess.PIPE)
     printers = subprocess.check_output(['cut', '-f1', '-d',  ' '], stdin=lpstat.stdout).split()
     lpstat.wait()
-    printers = [str(printer, 'utf-8') for printer in printers]
+    printers = [str(printer).decode('utf-8') for printer in printers]
     logging.debug("Found {} printers".format(",".join(printers)))
     return printers
 
