@@ -145,9 +145,9 @@ def _send_jobs_to_printer(s3):
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
     for job in _jobs():
         file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['key']))
-        logging.debug("Fetching {} from s3".format(file_to_print))
+        logging.info("Fetching {} from s3".format(file_to_print))
         s3.Bucket(job['bucket']).download_file(job['key'], file_to_print)
-        logging.debug("Printing {}".format(file_to_print))
+        logging.info("Printing {}".format(file_to_print))
         _print_file(file_to_print)
 
 
