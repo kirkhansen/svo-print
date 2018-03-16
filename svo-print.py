@@ -126,19 +126,23 @@ def _jobs():
     session = _get_aws_session()
     sqs = session.resource('sqs')
     queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'])
-    for message in queue.receive_messages(WaitTimeSeconds=19):
-        try:
-            records = json.loads(message.body)['Records']
-            for record in records:
-                s3_record = dict(
-                    key=record['s3']['object']['key'],
-                    bucket=record['s3']['bucket']['name']
-                )
-                yield s3_record
-        except Exception:
-            logging.exception("Error occured trying to print {}".format(message.body), exc_info=True)
-        else:
-            message.delete()
+    done = False
+    while not done:
+        messages = list(queue.receive_messages(WaitTimeSeconds=19, MaxNumberOfMessages=10))
+        done = bool(messages)
+        for message in messages:
+            try:
+                records = json.loads(message.body)['Records']
+                for record in records:
+                    s3_record = dict(
+                        key=record['s3']['object']['key'],
+                        bucket=record['s3']['bucket']['name']
+                    )
+                    yield s3_record
+            except Exception:
+                logging.exception("Error occured trying to print {}".format(message.body), exc_info=True)
+            else:
+                message.delete()
 
 
 def _send_jobs_to_printer(s3):
