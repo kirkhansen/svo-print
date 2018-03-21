@@ -128,31 +128,31 @@ def _jobs():
     queue = sqs.get_queue_by_name(QueueName=CONFIG[AWS_CONFIG_SECTION]['queue_name'])
     done = False
     while not done:
-        messages = list(queue.receive_messages(WaitTimeSeconds=19, MaxNumberOfMessages=10))
-        done = bool(messages)
-        for message in messages:
-            try:
-                records = json.loads(message.body)['Records']
-                for record in records:
-                    s3_record = dict(
-                        key=record['s3']['object']['key'],
-                        bucket=record['s3']['bucket']['name']
-                    )
-                    yield s3_record
-            except Exception:
-                logging.exception("Error occured trying to print {}".format(message.body), exc_info=True)
-            else:
-                message.delete()
+        response = queue.receive_messages(WaitTimeSeconds=19, MaxNumberOfMessages=10)
+        done = not bool(response)
+        for message in response:
+            records = json.loads(message.body)['Records']
+            for record in records:
+                s3_record = dict(
+                    key=record['s3']['object']['key'],
+                    bucket=record['s3']['bucket']['name']
+                )
+                yield message, s3_record
 
 
 def _send_jobs_to_printer(s3):
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
-    for job in _jobs():
-        file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['key']))
-        logging.info("Fetching {} from s3".format(file_to_print))
-        s3.Bucket(job['bucket']).download_file(job['key'], file_to_print)
-        logging.info("Printing {}".format(file_to_print))
-        _print_file(file_to_print)
+    for message, job in _jobs():
+        try:
+            file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['key']))
+            logging.info("Fetching {} from s3".format(file_to_print))
+            s3.Bucket(job['bucket']).download_file(job['key'], file_to_print)
+            logging.info("Printing {}".format(file_to_print))
+            _print_file(file_to_print)
+        except Exception:
+            logging.exception("Error sending jobs to printer")
+        else:
+            message.delete()
 
 
 @click.group()
@@ -195,11 +195,14 @@ def setup(access_key, secret_access_key, region, store_id, printer_name, executa
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
     # Let's just allow a single process to be running at a time.
+    setup_logging(default_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json'))
     attempts = 3
     s3 = _get_aws_session().resource('s3')
     while attempts > 0:
         _send_jobs_to_printer(s3)
         attempts -= 1
+        logging.info('Attempts left: {}'.format(attempts))
+
 
 
 if __name__ == '__main__':
