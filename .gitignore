@@ -5,3 +5,5 @@ dist/*
 *.pdf
 **.log
 **.zip
+venv/*
+*egg-info/*
