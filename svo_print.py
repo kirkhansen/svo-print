@@ -204,7 +204,6 @@ def run():
         logging.info('Attempts left: {}'.format(attempts))
 
 
-
 if __name__ == '__main__':
     setup_logging(default_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json'))
     svo_print()
