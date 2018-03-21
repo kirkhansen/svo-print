@@ -7,23 +7,26 @@ This assumes you have a python3 environment.
 
 ## CLI Usage
 First time use:
-1. Run `python svo-print.py setup`
+1. Run `svo-print setup`
 2. Add your information as the prompts dictate, or you can call `python svo-print.py setup` with the arguments directly
 
 ## Dev Usage
 There are two scripts, `build.sh` and `deploy.sh`. At the time of writing, deploy also called build.
-`build.sh` will bundle up the html-to-pdf lambda code and run pyinstaller. You'll want to run these with
+`build.sh` will bundle up the html-to-pdf lambda code and run bdist_wheel. You'll want to run these with
 in the python virtualenv your created, if you're using one.
 
 `deploy.sh` will send the bundled apps to s3, and will call the aws svo-print to make sure the lambda gets the updated code.
+The `deploy.sh` creates a wheel file in the `svo-print-config` s3 bucket to be installed by the end user later.
 
 There's also a cloudformation template that will setup the lambda, sqs, and s3 triggers.
 
 ## End User Installation Options
-The `deploy.sh` saves a zip file of the svo-print in the `svo-print-config` s3 bucket.
+First, have the user go to https://www.python.org/downloads/ and install python. This is bundled in a mac osx
+installer, and went smoothly on my 8 year old mac running 10.6.8.
+
 
 The end user should be able to fill out a form in the web app that generates a
-signed URL for download access to the `svo-print.zip` see
+signed URL for download access to the `svo_print-config/svo_print-[version+python-version]-any.whl` see
 [aws docs ruby signed url](https://docs.aws.amazon.com/AmazonS3/latest/dev/UploadObjectPreSignedURLRubySDK.html)
 
 The web app _could_ produce a command that could be copy pasted into a terminal.
@@ -31,16 +34,14 @@ It would look something like the following.
 
 ```bash
 pushd ~/ && \
-curl https://aws-signed-url-to-svo-print.zip -o ~/svo-print.zip && \
-unzip ~/svo-print.zip && \
-pushd svo-print && \
-./svo-print setup \
+curl https://aws-signed-url-to-svo-.whl -o ~/svo-print.whl && \
+pip3 install svo-print.whl && \
+svo-print setup \
     --access-key="AWS ACCESS KEY FROM WEB APP" \
     --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
     --region="us-east-1" \
     --store-id="id of the store" \
     --executable-path="$(pwd)"
-popd
 popd
 ```
 
