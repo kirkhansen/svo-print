@@ -8,7 +8,7 @@ This assumes you have a python3 environment.
 ## CLI Usage
 First time use:
 1. Run `svo-print setup`
-2. Add your information as the prompts dictate, or you can call `python svo-print.py setup` with the arguments directly
+2. Add your information as the prompts dictate, or you can call `svo-print setup` with the arguments directly
 
 ## Dev Usage
 There are two scripts, `build.sh` and `deploy.sh`. At the time of writing, deploy also called build.
@@ -29,13 +29,18 @@ The end user should be able to fill out a form in the web app that generates a
 signed URL for download access to the `svo_print-config/svo_print-[version+python-version]-any.whl` see
 [aws docs ruby signed url](https://docs.aws.amazon.com/AmazonS3/latest/dev/UploadObjectPreSignedURLRubySDK.html)
 
+After python is successfuly installed, and they have the .whl (wheel) file, they can run
+`pip3.6 install [the file].whl` in terminal.
+
+After that succeeds, there should be a new binary `svo-print`. Test by typing `svo-print` in a terminal.
+
 The web app _could_ produce a command that could be copy pasted into a terminal.
 It would look something like the following.
 
 ```bash
 pushd ~/ && \
 curl https://aws-signed-url-to-svo-.whl -o ~/svo-print.whl && \
-pip3 install svo-print.whl && \
+pip3.6 install svo-print.whl && \
 svo-print setup \
     --access-key="AWS ACCESS KEY FROM WEB APP" \
     --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
