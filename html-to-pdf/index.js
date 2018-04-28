@@ -9,7 +9,8 @@ function putObjectToS3(event, buffer, callback){
     let params = {
         Bucket: event.bucket,
         Key: event.key,
-        Body: buffer
+        Body: buffer,
+        ContentType: "application/pdf"
     };
     s3.putObject(params, function(err, data){
         if (err) {
