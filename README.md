@@ -34,6 +34,12 @@ After python is successfuly installed, and they have the .whl (wheel) file, they
 
 After that succeeds, there should be a new binary `svo-print`. Test by typing `svo-print` in a terminal.
 
+If that works, let's get a list of printers available printers with: `svo-print setup --help`
+
+Look for the `--printer-name` field. There should be a `|` separated list of available printers.
+
+Once you have that, you can go through the wizard with `svo-print setup`.
+
 The web app _could_ produce a command that could be copy pasted into a terminal.
 It would look something like the following.
 

@@ -5,6 +5,7 @@ import os
 import configparser
 import tempfile
 import subprocess
+from distutils.spawn import find_executable
 
 import boto3
 import click
@@ -155,6 +156,11 @@ def _send_jobs_to_printer(s3):
             message.delete()
 
 
+def _get_svo_binary_dir():
+    """Get you some path to bin"""
+    return os.path.dirname(find_executable('svo-print'))
+
+
 @click.group()
 def svo_print():
     """Commands to send SVO print requests to the network printer"""
@@ -172,8 +178,8 @@ def svo_print():
               default=CONFIG[PRINTER_CONFIG_SECTION].get('printer_name', _get_available_printers()[0]),
               type=click.Choice(_get_available_printers()))
 @click.option('--executable-path', help='Path to where you unzipped this program', required=True, prompt=True,
-              type=click.Path(exists=True, dir_okay=True, file_okay=False),
-              default=CONFIG[PRINTER_CONFIG_SECTION].get('executable', os.getcwd()))
+              type=click.Path(exists=True, dir_okay=True, file_okay=False), show_default=True,
+              default=CONFIG[PRINTER_CONFIG_SECTION].get('executable', _get_svo_binary_dir()))
 def setup(access_key, secret_access_key, region, store_id, printer_name, executable_path):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
@@ -205,5 +211,6 @@ def run():
 
 
 if __name__ == '__main__':
-    setup_logging(default_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json'))
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json')
+    setup_logging(default_path=file_path)
     svo_print()
