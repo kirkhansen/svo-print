@@ -7,7 +7,7 @@ This assumes you have a python3 environment.
 
 ## CLI Usage
 First time use:
-1. Run `svo-print setup`
+1. Run `sudo svo-print setup`
 2. Add your information as the prompts dictate, or you can call `svo-print setup` with the arguments directly
 
 ## Dev Usage
@@ -38,7 +38,7 @@ If that works, let's get a list of printers available printers with: `svo-print 
 
 Look for the `--printer-name` field. There should be a `|` separated list of available printers.
 
-Once you have that, you can go through the wizard with `svo-print setup`.
+Once you have that, you can go through the wizard with `sudo svo-print setup`.
 
 The web app _could_ produce a command that could be copy pasted into a terminal.
 It would look something like the following.
@@ -47,7 +47,7 @@ It would look something like the following.
 pushd ~/ && \
 curl https://aws-signed-url-to-svo-.whl -o ~/svo-print.whl && \
 pip3.6 install svo-print.whl && \
-svo-print setup \
+sudo svo-print setup \
     --access-key="AWS ACCESS KEY FROM WEB APP" \
     --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
     --region="us-east-1" \
