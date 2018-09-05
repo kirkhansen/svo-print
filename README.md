@@ -45,14 +45,14 @@ It would look something like the following.
 
 ```bash
 pushd ~/ && \
-curl https://aws-signed-url-to-svo-.whl -o ~/svo-print.whl && \
+curl "https://aws-signed-url-to-svo-.whl" -o ~/svo-print.whl && \
 pip3.6 install svo-print.whl && \
 sudo svo-print setup \
     --access-key="AWS ACCESS KEY FROM WEB APP" \
     --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
     --region="us-east-1" \
     --store-id="id of the store" \
-    --executable-path="$(pwd)"
+    --executable-path="$(pwd)" && \
 popd
 ```
 
