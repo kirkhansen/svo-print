@@ -7,15 +7,11 @@ install_requires = [
     'python-crontab'
 ]
 
-data_files = ['logging.json']
-
-
 setup(
     name='svo-print',
-    version='0.1',
+    version='0.2',
     py_modules=['svo_print'],
     install_requires=install_requires,
-    data_files=data_files,
     entry_points='''
     [console_scripts]
     svo-print=svo_print:svo_print

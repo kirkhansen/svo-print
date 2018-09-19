@@ -1,11 +1,13 @@
 import getpass
 import json
-import logging.config
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 import configparser
 import tempfile
 import subprocess
 from distutils.spawn import find_executable
+from pathlib import Path
 
 import boto3
 import click
@@ -15,11 +17,28 @@ from crontab import CronTab
 # but I'm not sure how that will work with Pyinstaller.
 # Try it out so this code is more maintainable.
 
-APP_NAME = "svo-print"
+_paths = (
+    os.environ.get('PATH', ''), '/bin', '/usr/local/bin', '/Library/Frameworks/Python.framework/Versions/3.6/bin')
+
+os.environ.update({
+    'PATH': ':'.join(path for path in _paths if path),
+    'LC_CTYPE': 'en_US.UTF-8',
+})
+
+APP_NAME = 'svo-print'
 AWS_CONFIG_SECTION = 'AWS'
 PRINTER_CONFIG_SECTION = 'PRINTER'
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
+
+LOG_FILE = str(Path('/var/log/{}.log'.format(APP_NAME)))
+LOG_LEVEL_LOOKUP = {
+    'error': logging.ERROR,
+    'info': logging.INFO,
+    'debug': logging.DEBUG,
+}
+
+LOGGER = logging.getLogger(__name__)
 
 CLI_WARN = 'yellow'
 CLI_ERROR = 'red'
@@ -27,17 +46,22 @@ CLI_SUCCESS = 'green'
 CLI_INFO = 'blue'
 
 
-def setup_logging(default_path='logging.json', default_level=logging.INFO, env_key='LOG_CFG'):
-    path = os.getenv(env_key, default_path)
-    try:
-        with open(path, 'r') as f:
-            config = json.load(f)
-        logging.config.dictConfig(config)
-    except FileNotFoundError:
-        logging.basicConfig(level=default_level)
+def setup_logging(default_level='error', env_log_file='LOG_FILE', env_log_level='LOG_LEVEL'):
+    path = os.getenv(env_log_file, LOG_FILE)
+    level = LOG_LEVEL_LOOKUP.get(os.getenv(env_log_level, default_level), logging.ERROR)
+
+    logging.basicConfig(
+        level=level,
+        handlers=[
+            RotatingFileHandler(path, maxBytes=2000, backupCount=3),
+            logging.StreamHandler(),
+        ],
+        format="%(asctime)s [%(levelname)-5.5s]  %(message)s",
+    )
 
 
 def _get_config():
+    print('Reading config file {}'.format(CONFIG_FILE))
     if not os.path.exists(click.get_app_dir(APP_NAME)):
         os.makedirs(click.get_app_dir(APP_NAME), exist_ok=True)
     parser = configparser.ConfigParser()
@@ -56,7 +80,7 @@ CONFIG = _get_config()
 
 
 def _get_aws_session():
-    logging.debug("Getting s3 session")
+    LOGGER.debug("Getting s3 session")
     session = boto3.Session(
         aws_access_key_id=CONFIG[AWS_CONFIG_SECTION]['access_key'],
         aws_secret_access_key=CONFIG[AWS_CONFIG_SECTION]['secret_access_key'],
@@ -66,12 +90,12 @@ def _get_aws_session():
 
 
 def _get_available_printers():
-    logging.debug("Searching for printers")
+    LOGGER.debug("Searching for printers")
     lpstat = subprocess.Popen(['lpstat', '-a'], stdout=subprocess.PIPE)
     printers = subprocess.check_output(['cut', '-f1', '-d',  ' '], stdin=lpstat.stdout).split()
     lpstat.wait()
     printers = [str(printer, 'utf-8') for printer in printers]
-    logging.debug("Found {} printers".format(",".join(printers)))
+    LOGGER.debug("Found {} printers".format(",".join(printers)))
     return printers
 
 
@@ -92,6 +116,7 @@ def _generate_config(val_dict):
 
     with open(CONFIG_FILE, 'w') as config_file:
         cfg.write(config_file)
+    LOGGER.info('Saved config file to {}'.format(CONFIG_FILE))
     return cfg
 
 
@@ -104,13 +129,13 @@ def _schedule(config):
     cmd = "{}/{}".format(config[PRINTER_CONFIG_SECTION]['executable'], config[PRINTER_CONFIG_SECTION]['cmd'])
     try:
         job = next(crontab.find_comment('print-job'))
-        logging.info('Cron exists. Updating.')
+        LOGGER.info('Cron exists. Updating.')
         job.command = cmd
     except StopIteration:
-        logging.info('Adding new cron job.')
+        LOGGER.info('Adding new cron job.')
         crontab.new(comment='print-job', command=cmd)
         job = next(crontab.find_comment('print-job'))
-    job.setall('* 8-17 * * 1-5')
+    job.setall('* 7-21 * * *')
     crontab.write()
 
 
@@ -146,12 +171,12 @@ def _send_jobs_to_printer(s3):
     for message, job in _jobs():
         try:
             file_to_print = os.path.join(tempfile.gettempdir(), os.path.basename(job['key']))
-            logging.info("Fetching {} from s3".format(file_to_print))
+            LOGGER.info("Fetching {} from s3".format(file_to_print))
             s3.Bucket(job['bucket']).download_file(job['key'], file_to_print)
-            logging.info("Printing {}".format(file_to_print))
+            LOGGER.info("Printing {}".format(file_to_print))
             _print_file(file_to_print)
         except Exception:
-            logging.exception("Error sending jobs to printer")
+            LOGGER.exception("Error sending jobs to printer")
         else:
             message.delete()
 
@@ -185,6 +210,7 @@ def setup(access_key, secret_access_key, region, store_id, printer_name, executa
     Setup the printing application. You may pass in the variables from the commandline directly, or
     omit them, and enter them via the wizard prompt.
     """
+    setup_logging()
     config_vals = dict(
         access_key=access_key,
         secret_access_key=secret_access_key,
@@ -201,16 +227,16 @@ def setup(access_key, secret_access_key, region, store_id, printer_name, executa
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
     # Let's just allow a single process to be running at a time.
-    setup_logging(default_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json'))
+    setup_logging()
+    LOGGER.debug("Starting attempts")
     attempts = 3
     s3 = _get_aws_session().resource('s3')
     while attempts > 0:
         _send_jobs_to_printer(s3)
         attempts -= 1
-        logging.info('Attempts left: {}'.format(attempts))
+        LOGGER.info('Attempts left: {}'.format(attempts))
 
 
 if __name__ == '__main__':
-    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logging.json')
-    setup_logging(default_path=file_path)
+    setup_logging()
     svo_print()
