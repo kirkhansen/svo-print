@@ -44,15 +44,15 @@ The web app _could_ produce a command that could be copy pasted into a terminal.
 It would look something like the following.
 
 ```bash
-pushd ~/ && \
+# assuming user ran `sudo su` to get a true root terminal first...
+pushd / && \
 curl "https://aws-signed-url-to-svo-.whl" -o ~/svo-print.whl && \
 pip3.6 install svo-print.whl && \
-sudo svo-print setup \
+svo-print setup \
     --access-key="AWS ACCESS KEY FROM WEB APP" \
     --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
     --region="us-east-1" \
-    --store-id="id of the store" \
-    --executable-path="$(pwd)" && \
+    --store-id="id of the store"
 popd
 ```
 
