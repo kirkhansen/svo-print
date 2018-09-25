@@ -6,7 +6,6 @@ import os
 import configparser
 import tempfile
 import subprocess
-from distutils.spawn import find_executable
 from pathlib import Path
 
 import boto3
@@ -17,11 +16,7 @@ from crontab import CronTab
 # but I'm not sure how that will work with Pyinstaller.
 # Try it out so this code is more maintainable.
 
-_paths = (
-    os.environ.get('PATH', ''), '/bin', '/usr/local/bin', '/Library/Frameworks/Python.framework/Versions/3.6/bin')
-
 os.environ.update({
-    'PATH': ':'.join(path for path in _paths if path),
     'LC_CTYPE': 'en_US.UTF-8',
 })
 
@@ -61,7 +56,6 @@ def setup_logging(default_level='error', env_log_file='LOG_FILE', env_log_level=
 
 
 def _get_config():
-    print('Reading config file {}'.format(CONFIG_FILE))
     if not os.path.exists(click.get_app_dir(APP_NAME)):
         os.makedirs(click.get_app_dir(APP_NAME), exist_ok=True)
     parser = configparser.ConfigParser()
@@ -126,7 +120,10 @@ def _schedule(config):
     on workdays between 8am and 5pm
     """
     crontab = CronTab(user=getpass.getuser())
-    cmd = "{}/{}".format(config[PRINTER_CONFIG_SECTION]['executable'], config[PRINTER_CONFIG_SECTION]['cmd'])
+    cmd = "{} {}/{}".format(
+        ' '.join("{}={}".format(key, value) for key, value in os.environ.items()),
+        config[PRINTER_CONFIG_SECTION]['executable'],
+        config[PRINTER_CONFIG_SECTION]['cmd'])
     try:
         job = next(crontab.find_comment('print-job'))
         LOGGER.info('Cron exists. Updating.')
@@ -181,11 +178,6 @@ def _send_jobs_to_printer(s3):
             message.delete()
 
 
-def _get_svo_binary_dir():
-    """Get you some path to bin"""
-    return os.path.dirname(find_executable('svo-print'))
-
-
 @click.group()
 def svo_print():
     """Commands to send SVO print requests to the network printer"""
@@ -204,7 +196,7 @@ def svo_print():
               type=click.Choice(_get_available_printers()))
 @click.option('--executable-path', help='Path to where you unzipped this program', required=True, prompt=True,
               type=click.Path(exists=True, dir_okay=True, file_okay=False), show_default=True,
-              default=CONFIG[PRINTER_CONFIG_SECTION].get('executable', _get_svo_binary_dir()))
+              default=CONFIG[PRINTER_CONFIG_SECTION].get('executable', ''))
 def setup(access_key, secret_access_key, region, store_id, printer_name, executable_path):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
@@ -229,12 +221,15 @@ def run():
     # Let's just allow a single process to be running at a time.
     setup_logging()
     LOGGER.debug("Starting attempts")
-    attempts = 3
-    s3 = _get_aws_session().resource('s3')
-    while attempts > 0:
-        _send_jobs_to_printer(s3)
-        attempts -= 1
-        LOGGER.info('Attempts left: {}'.format(attempts))
+    try:
+        attempts = 3
+        s3 = _get_aws_session().resource('s3')
+        while attempts > 0:
+            _send_jobs_to_printer(s3)
+            attempts -= 1
+            LOGGER.info('Attempts left: {}'.format(attempts))
+    except Exception:
+        LOGGER.exception("Error in run.")
 
 
 if __name__ == '__main__':
