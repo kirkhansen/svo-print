@@ -43,7 +43,7 @@ exports.handler = function handler(event, context, callback) {
     if (validateParams(event, callback) === false) {
         return;
     }
-    wkhtmltopdf(event.html)
+    wkhtmltopdf(event.html, event.options)
         .then(function (buffer) {
             putObjectToS3(event, buffer, callback)
         }).catch(function (error) {
