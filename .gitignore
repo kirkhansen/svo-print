@@ -7,3 +7,6 @@ dist/*
 **.zip
 venv/*
 *egg-info/*
+.python-version
+*.pyc
+.vscode/

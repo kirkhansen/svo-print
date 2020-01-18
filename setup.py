@@ -1,21 +1,23 @@
 from setuptools import setup, find_packages
 
 install_requires = [
-    'click',
-    'boto3',
+    "click",
+    "boto3",
     "botocore",
-    'python-crontab'
+    "python-crontab",
+    "configparser",
+    "pathlib",
 ]
 
 setup(
-    name='svo-print',
-    version='0.2',
-    py_modules=['svo_print'],
+    name="svo-print",
+    version="0.3",
+    py_modules=["svo_print"],
     install_requires=install_requires,
-    entry_points='''
+    entry_points="""
     [console_scripts]
     svo-print=svo_print:svo_print
-    ''',
+    """,
     packages=find_packages(),
-    python_requires='>=3.5',
+    python_requires=">=2.7",
 )

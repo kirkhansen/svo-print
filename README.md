@@ -1,5 +1,4 @@
 ## Installation
-This assumes you have a python3 environment.
 1. `git clone git@github.com:kirkhansen/svo-print.git`
 2. `workon your-new-virtualenv`
 3. `pip install -r requirements-dev.txt` (or `pip install -r requirements.txt` if you're just using it)

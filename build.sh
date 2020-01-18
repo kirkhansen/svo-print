@@ -2,7 +2,8 @@
 
 set -e
 
-python3.6 setup.py bdist_wheel
+#python3 setup.py bdist_wheel
+python2 setup.py bdist_wheel
 
 pushd html-to-pdf
 npm install
