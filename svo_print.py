@@ -7,6 +7,7 @@ import configparser
 import tempfile
 import subprocess
 from pathlib import Path
+from six import ensure_str
 
 import boto3
 import click
@@ -26,7 +27,7 @@ PRINTER_CONFIG_SECTION = "PRINTER"
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), "config.ini")
 
-LOG_FILE = str(Path("/var/log/{}.log".format(APP_NAME)))
+LOG_FILE = ensure_str(str(Path("/var/log/{}.log".format(APP_NAME))))
 LOG_LEVEL_LOOKUP = {
     "error": logging.ERROR,
     "info": logging.INFO,
@@ -92,7 +93,7 @@ def _get_available_printers():
         ["cut", "-f1", "-d", " "], stdin=lpstat.stdout
     ).split()
     lpstat.wait()
-    printers = [str(printer) for printer in printers]
+    printers = [ensure_str(printer) for printer in printers]
     LOGGER.debug("Found {} printers".format(",".join(printers)))
     return printers
 

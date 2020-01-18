@@ -7,6 +7,7 @@ install_requires = [
     "python-crontab",
     "configparser",
     "pathlib",
+    "six",
 ]
 
 setup(
