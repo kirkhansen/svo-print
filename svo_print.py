@@ -16,6 +16,7 @@ from crontab import CronTab
 # TODO: Typically, a lot of this code would be split out into several modules,
 # but I'm not sure how that will work with Pyinstaller.
 # Try it out so this code is more maintainable.
+# TODO: Logging is confusing here. simplify it by moving it into it's own module.
 
 os.environ.update(
     {"LC_CTYPE": "en_US.UTF-8",}
@@ -24,39 +25,43 @@ os.environ.update(
 APP_NAME = "svo-print"
 AWS_CONFIG_SECTION = "AWS"
 PRINTER_CONFIG_SECTION = "PRINTER"
+EXECUTABLE_PATH = ensure_str(str(Path(__file__).parent.absolute()))
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), "config.ini")
 
-LOG_FILE = ensure_str(str(Path("/var/log/{}.log".format(APP_NAME))))
+LOG_FILE = ensure_str(str(Path(click.get_app_dir(APP_NAME), "log/{}.log".format(APP_NAME))))
 LOG_LEVEL_LOOKUP = {
     "error": logging.ERROR,
     "info": logging.INFO,
     "debug": logging.DEBUG,
 }
 
-LOGGER = logging.getLogger(__name__)
-
 CLI_WARN = "yellow"
 CLI_ERROR = "red"
 CLI_SUCCESS = "green"
 CLI_INFO = "blue"
 
+ENV_VARS_TO_PASS_TO_COMMAND = {"LC_CTYPE", "LOG_FILE", "LOG_LEVEL"}
+
 
 def setup_logging(
-    default_level="error", env_log_file="LOG_FILE", env_log_level="LOG_LEVEL"
+    name, default_level="error", env_log_file="LOG_FILE", env_log_level="LOG_LEVEL"
 ):
     path = os.getenv(env_log_file, LOG_FILE)
+    if not os.path.exists(path):
+        Path(path).parent.mkdir()
     level = LOG_LEVEL_LOOKUP.get(os.getenv(env_log_level, default_level), logging.ERROR)
+    stream_handler = logging.StreamHandler()
+    file_handler = RotatingFileHandler(path, maxBytes=2000, backupCount=3)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s"))
 
-    logging.basicConfig(
-        level=level,
-        handlers=[
-            RotatingFileHandler(path, maxBytes=2000, backupCount=3),
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s [%(levelname)-5.5s]  %(message)s",
-    )
+    logger = logging.getLogger(name)
+    logger.setLevel(level) 
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+    return logger
 
+LOGGER = setup_logging(__name__)
 
 def _get_config():
     if not os.path.exists(click.get_app_dir(APP_NAME)):
@@ -115,9 +120,10 @@ def _generate_config(val_dict):
         "queue_name": val_dict["store_id"],
     }
     cfg[PRINTER_CONFIG_SECTION] = {
-        "executable": val_dict["executable_path"],
+        "executable_path": val_dict["executable_path"],
         "cmd": "svo-print run",
         "printer_name": val_dict["printer_name"],
+        "default_log_level": val_dict["default_log_level"]
     }
 
     with open(CONFIG_FILE, "w") as config_file:
@@ -129,14 +135,16 @@ def _generate_config(val_dict):
 def _schedule(config):
     """
     Setups up a cron job to make sure the print job process is running. Run this every minute
-    on workdays between 8am and 5pm
+    on workdays between 7am and 9pm
     """
     crontab = CronTab(user=getpass.getuser())
-    cmd = "{} {}/{}".format(
-        " ".join("{}={}".format(key, value) for key, value in os.environ.items()),
-        config[PRINTER_CONFIG_SECTION]["executable"],
+    cmd = "{} {} {}/{}".format(
+        " ".join("{}={}".format(key, value) for key, value in os.environ.items() if key in ENV_VARS_TO_PASS_TO_COMMAND),
+        "LOG_LEVEL={}".format(config[PRINTER_CONFIG_SECTION]["default_log_level"]),
+        config[PRINTER_CONFIG_SECTION]["executable_path"],
         config[PRINTER_CONFIG_SECTION]["cmd"],
     )
+    LOGGER.info("Adding command: '{}'".format(cmd))
     try:
         job = next(crontab.find_comment("print-job"))
         LOGGER.info("Cron exists. Updating.")
@@ -248,16 +256,21 @@ def svo_print():
     prompt=True,
     type=click.Path(exists=True, dir_okay=True, file_okay=False),
     show_default=True,
-    default=CONFIG[PRINTER_CONFIG_SECTION].get("executable", ""),
+    default=CONFIG[PRINTER_CONFIG_SECTION].get("executable_path", EXECUTABLE_PATH),
+)
+@click.option(
+    "--default-log-level",
+    help="Default Logging level to use",
+    default="error",
+    type=click.Choice(["error", "info", "debug"])
 )
 def setup(
-    access_key, secret_access_key, region, store_id, printer_name, executable_path
+    access_key, secret_access_key, region, store_id, printer_name, executable_path, default_log_level,
 ):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
     omit them, and enter them via the wizard prompt.
     """
-    setup_logging()
     config_vals = dict(
         access_key=access_key,
         secret_access_key=secret_access_key,
@@ -265,6 +278,7 @@ def setup(
         store_id=store_id,
         printer_name=printer_name,
         executable_path=executable_path,
+        default_log_level=default_log_level,
     )
     config = _generate_config(config_vals)
     _schedule(config)
@@ -274,7 +288,6 @@ def setup(
 def run():
     """Poll the SQS queue for jobs, and send them to the printer."""
     # Let's just allow a single process to be running at a time.
-    setup_logging()
     LOGGER.debug("Starting attempts")
     try:
         attempts = 3
@@ -288,5 +301,4 @@ def run():
 
 
 if __name__ == "__main__":
-    setup_logging()
     svo_print()
