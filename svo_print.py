@@ -29,7 +29,9 @@ EXECUTABLE_PATH = ensure_str(str(Path(__file__).parent.absolute()))
 
 CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), "config.ini")
 
-LOG_FILE = ensure_str(str(Path(click.get_app_dir(APP_NAME), "log/{}.log".format(APP_NAME))))
+LOG_FILE = ensure_str(
+    str(Path(click.get_app_dir(APP_NAME), "log/{}.log".format(APP_NAME)))
+)
 LOG_LEVEL_LOOKUP = {
     "error": logging.ERROR,
     "info": logging.INFO,
@@ -53,15 +55,19 @@ def setup_logging(
     level = LOG_LEVEL_LOOKUP.get(os.getenv(env_log_level, default_level), logging.ERROR)
     stream_handler = logging.StreamHandler()
     file_handler = RotatingFileHandler(path, maxBytes=2000, backupCount=3)
-    file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s"))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+    )
 
     logger = logging.getLogger(name)
-    logger.setLevel(level) 
+    logger.setLevel(level)
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
     return logger
 
+
 LOGGER = setup_logging(__name__)
+
 
 def _get_config():
     if not os.path.exists(click.get_app_dir(APP_NAME)):
@@ -110,6 +116,7 @@ def _get_default_printer():
         printer = ""
     return printer
 
+
 def _generate_config(val_dict):
     cfg = configparser.ConfigParser()
 
@@ -123,7 +130,7 @@ def _generate_config(val_dict):
         "executable_path": val_dict["executable_path"],
         "cmd": "svo-print run",
         "printer_name": val_dict["printer_name"],
-        "default_log_level": val_dict["default_log_level"]
+        "default_log_level": val_dict["default_log_level"],
     }
 
     with open(CONFIG_FILE, "w") as config_file:
@@ -139,7 +146,11 @@ def _schedule(config):
     """
     crontab = CronTab(user=getpass.getuser())
     cmd = "{} {} {}/{}".format(
-        " ".join("{}={}".format(key, value) for key, value in os.environ.items() if key in ENV_VARS_TO_PASS_TO_COMMAND),
+        " ".join(
+            "{}={}".format(key, value)
+            for key, value in os.environ.items()
+            if key in ENV_VARS_TO_PASS_TO_COMMAND
+        ),
         "LOG_LEVEL={}".format(config[PRINTER_CONFIG_SECTION]["default_log_level"]),
         config[PRINTER_CONFIG_SECTION]["executable_path"],
         config[PRINTER_CONFIG_SECTION]["cmd"],
@@ -244,9 +255,7 @@ def svo_print():
     help="Name of your network printer",
     required=True,
     prompt=True,
-    default=CONFIG[PRINTER_CONFIG_SECTION].get(
-        "printer_name", _get_default_printer()
-    ),
+    default=CONFIG[PRINTER_CONFIG_SECTION].get("printer_name", _get_default_printer()),
     type=click.Choice(_get_available_printers()),
 )
 @click.option(
@@ -262,10 +271,16 @@ def svo_print():
     "--default-log-level",
     help="Default Logging level to use",
     default="error",
-    type=click.Choice(["error", "info", "debug"])
+    type=click.Choice(["error", "info", "debug"]),
 )
 def setup(
-    access_key, secret_access_key, region, store_id, printer_name, executable_path, default_log_level,
+    access_key,
+    secret_access_key,
+    region,
+    store_id,
+    printer_name,
+    executable_path,
+    default_log_level,
 ):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
