@@ -161,8 +161,8 @@ def _print_file(file_to_print):
     """ Send the job to the printer. This assumes Mac or Unix like system where lpr exists."""
     subprocess.check_call(
         [
-            "lpr",
-            "-P",
+            "lp",
+            "-d",
             CONFIG[PRINTER_CONFIG_SECTION]["printer_name"],
             "-o",
             "fit-to-page",
