@@ -1,7 +1,7 @@
 ## Installation
 1. `git clone git@github.com:kirkhansen/svo-print.git`
 2. `workon your-new-virtualenv`
-3. `pip install -r requirements-dev.txt` (or `pip install -r requirements.txt` if you're just using it)
+3. `pip install -e .`
 
 
 ## CLI Usage
@@ -28,8 +28,8 @@ The end user should be able to fill out a form in the web app that generates a
 signed URL for download access to the `svo_print-config/svo_print-[version+python-version]-any.whl` see
 [aws docs ruby signed url](https://docs.aws.amazon.com/AmazonS3/latest/dev/UploadObjectPreSignedURLRubySDK.html)
 
-After python is successfuly installed, and they have the .whl (wheel) file, they can run
-`pip3.6 install [the file].whl` in terminal.
+After they have the .whl (wheel) file, they can run
+`pip2.7 install [the file].whl` in terminal.
 
 After that succeeds, there should be a new binary `svo-print`. Test by typing `svo-print` in a terminal.
 
@@ -46,14 +46,32 @@ It would look something like the following.
 # assuming user ran `sudo su` to get a true root terminal first...
 pushd / && \
 curl "https://aws-signed-url-to-svo-.whl" -o ~/svo-print.whl && \
-pip3.6 install svo-print.whl && \
+pip2.7 install svo-print.whl && \
 svo-print setup \
-    --access-key="AWS ACCESS KEY FROM WEB APP" \
-    --secret-access-key="AWS SECRET ACCESS KEY FROM WEB APP" \
+    --access-key="AKIAJUNJIN5FPYVGHHTA" \
+    --secret-access-key="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" \
     --region="us-east-1" \
-    --store-id="id of the store"
+    --queue-name="test-svo-print-store" \
+    --default-log-level="info"
 popd
 ```
+
+This provides most of the config options, but the printer config options will need to be filled in by the user when prompted.
+The cli should list the available printers to choose from, e.g.,
+
+```bash
+$ svo-print setup \
+    --access-key="AKIAJUNJIN5FPYVGHHTA" \
+    --secret-access-key="YcJexWW6tmZTsktk7oXWPssIqsz6jpaMMhn3NXcX" \
+    --region="us-east-1" \
+    --queue-name="test-svo-print-store" \
+    --default-log-level="info"
+Executable path [/home/kirk/wokspace/svo-print/svo_print.py]:
+Us letter printer (HP_ENVY_5540_series) [HP_ENVY_5540_series]:
+Label printer (HP_ENVY_5540_series) [HP_ENVY_5540_series]:
+```
+
+Note the `Us letter printer` and `Label printer` options. I only have one printer on the my network, so the choice is that listed in ().
 
 There are several ways to handle the access key stuff. The first few that come to mind are:
 
@@ -67,7 +85,7 @@ There are several ways to handle the access key stuff. The first few that come t
    if they don't exist already.
 3. Use something like Cognito, or other federation service to allow users from
    other systems (LDAP, Google, etc) to assume a role that has the ability the
-   store users would have. This is 'best practice', but is probably overkill.
+   store users would have. This is best practice, but is probably overkill.
 4. Have the form the user submits send a notification to an admin that can
    manually create all this stuff, and send them an email with what to run and
    how to get going.
