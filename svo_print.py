@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 import getpass
 import json
 import logging
@@ -24,10 +25,11 @@ os.environ.update(
 
 APP_NAME = "svo-print"
 AWS_CONFIG_SECTION = "AWS"
-PRINTER_CONFIG_SECTION = "PRINTER"
-EXECUTABLE_PATH = ensure_str(str(Path(__file__).parent.absolute()))
+CRON_CONFIG_SECTION = "CRON"
+CONFIGURED_PRINTERS_SECTION = "CONFIGURED_PRINTERS"
+EXECUTABLE_PATH = ensure_str(str(Path(__file__).absolute()))
 
-CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), "config.ini")
+CONFIG_FILE = os.path.join(click.get_app_dir(APP_NAME), "config.json")
 
 LOG_FILE = ensure_str(
     str(Path(click.get_app_dir(APP_NAME), "log/{}.log".format(APP_NAME)))
@@ -70,16 +72,20 @@ LOGGER = setup_logging(__name__)
 
 
 def _get_config():
-    if not os.path.exists(click.get_app_dir(APP_NAME)):
-        Path(click.get_app_dir(APP_NAME)).mkdir(parents=True)
-    parser = configparser.ConfigParser()
-    parser.read(CONFIG_FILE)
+    config_file =  Path(CONFIG_FILE)
+    if not config_file.parent.exists():
+        config_file.parent.mkdir(parents=True)
+    if not config_file.exists():
+        config_dict = {}
+    else: 
+        with config_file.open() as f:
+            config_dict = json.load(f)
 
-    if not parser.has_section(AWS_CONFIG_SECTION):
-        parser.add_section(AWS_CONFIG_SECTION)
-    if not parser.has_section(PRINTER_CONFIG_SECTION):
-        parser.add_section(PRINTER_CONFIG_SECTION)
-    return parser
+    for section in [AWS_CONFIG_SECTION, CRON_CONFIG_SECTION, CONFIGURED_PRINTERS_SECTION]:
+        if section not in config_dict:
+            config_dict[section] = {}
+
+    return config_dict
 
 
 # doing this so the click options can have some defaults if the wizard is run again, or the config file is
@@ -118,23 +124,22 @@ def _get_default_printer():
 
 
 def _generate_config(val_dict):
-    cfg = configparser.ConfigParser()
-
+    cfg = {}
     cfg[AWS_CONFIG_SECTION] = {
         "access_key": val_dict["access_key"],
         "secret_access_key": val_dict["secret_access_key"],
         "region": val_dict["region"],
-        "queue_name": val_dict["store_id"],
+        "queue_name": val_dict["queue_name"],
     }
-    cfg[PRINTER_CONFIG_SECTION] = {
+    cfg[CONFIGURED_PRINTERS_SECTION] = val_dict["printers"]
+    cfg[CRON_CONFIG_SECTION] = {
         "executable_path": val_dict["executable_path"],
-        "cmd": "svo-print run",
-        "printer_name": val_dict["printer_name"],
+        "cmd": "run",
         "default_log_level": val_dict["default_log_level"],
     }
 
     with open(CONFIG_FILE, "w") as config_file:
-        cfg.write(config_file)
+        json.dump(cfg, config_file)
     LOGGER.info("Saved config file to {}".format(CONFIG_FILE))
     return cfg
 
@@ -145,15 +150,15 @@ def _schedule(config):
     on workdays between 7am and 9pm
     """
     crontab = CronTab(user=getpass.getuser())
-    cmd = "{} {} {}/{}".format(
+    cmd = "{} {} {} {}".format(
         " ".join(
             "{}={}".format(key, value)
             for key, value in os.environ.items()
             if key in ENV_VARS_TO_PASS_TO_COMMAND
         ),
-        "LOG_LEVEL={}".format(config[PRINTER_CONFIG_SECTION]["default_log_level"]),
-        config[PRINTER_CONFIG_SECTION]["executable_path"],
-        config[PRINTER_CONFIG_SECTION]["cmd"],
+        "LOG_LEVEL={}".format(config[CRON_CONFIG_SECTION]["default_log_level"]),
+        config[CRON_CONFIG_SECTION]["executable_path"],
+        config[CRON_CONFIG_SECTION]["cmd"],
     )
     LOGGER.info("Adding command: '{}'".format(cmd))
     try:
@@ -168,13 +173,13 @@ def _schedule(config):
     crontab.write()
 
 
-def _print_file(file_to_print):
+def _print_file(file_to_print, printer_name):
     """ Send the job to the printer. This assumes Mac or Unix like system where lpr exists."""
     subprocess.check_call(
         [
             "lp",
             "-d",
-            CONFIG[PRINTER_CONFIG_SECTION]["printer_name"],
+            printer_name,
             "-o",
             "fit-to-page",
             file_to_print,
@@ -199,23 +204,37 @@ def _jobs():
                 )
                 yield message, s3_record
 
+def _download_file(s3, message, job):
+    file_to_print, printer_config = None, None
+    try:
+        file_to_print = os.path.join(
+            tempfile.gettempdir(), os.path.basename(job["key"])
+        )
+        _, printer_config, _ = job["key"].split("/")
+        LOGGER.info("Fetching {} from s3".format(file_to_print))
+        s3.Bucket(job["bucket"]).download_file(job["key"], file_to_print)
+        LOGGER.info("Printer config is {}".format(printer_config))
+        LOGGER.info("Printing {}".format(file_to_print))
+    except OSError:
+        # This appears to happen when trying to download a dir key instead of a single object.
+        # Delete the message
+        LOGGER.warning("Looks like we tried to download a directory; message will be deleted. Key was {}".format(job["key"]))
+        message.delete()
+    return str(file_to_print), str(printer_config)
 
 def _send_jobs_to_printer(s3):
-    """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer. """
+    """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer(s). """
     for message, job in _jobs():
-        try:
-            file_to_print = os.path.join(
-                tempfile.gettempdir(), os.path.basename(job["key"])
-            )
-            LOGGER.info("Fetching {} from s3".format(file_to_print))
-            s3.Bucket(job["bucket"]).download_file(job["key"], file_to_print)
-            LOGGER.info("Printing {}".format(file_to_print))
-            _print_file(file_to_print)
-        except Exception:
-            LOGGER.exception("Error sending jobs to printer")
+        file_to_print, printer_config = _download_file(s3, message, job)
+        if file_to_print and printer_config in CONFIG[CONFIGURED_PRINTERS_SECTION]:
+            try:
+                _print_file(file_to_print, CONFIG[CONFIGURED_PRINTERS_SECTION][printer_config])
+            except Exception:
+                LOGGER.exception("Error sending jobs to printer")
+            else:
+                message.delete()
         else:
-            message.delete()
-
+            LOGGER.warning("file_to_print was empty or Printer config {} doesn't exist in CONFIG".format(printer_config))
 
 @click.group()
 def svo_print():
@@ -244,28 +263,20 @@ def svo_print():
     prompt=True,
 )
 @click.option(
-    "--store-id",
-    help="Id of your store",
+    "--queue-name",
+    help="The SQS name to pull jobs from; should be the id of your store",
     required=True,
     prompt=True,
     default=CONFIG[AWS_CONFIG_SECTION].get("queue_name", ""),
 )
 @click.option(
-    "--printer-name",
-    help="Name of your network printer",
-    required=True,
-    prompt=True,
-    default=CONFIG[PRINTER_CONFIG_SECTION].get("printer_name", _get_default_printer()),
-    type=click.Choice(_get_available_printers()),
-)
-@click.option(
     "--executable-path",
-    help="Path to where you unzipped this program",
+    help="Full path to this python file.",
     required=True,
     prompt=True,
-    type=click.Path(exists=True, dir_okay=True, file_okay=False),
+    type=click.Path(exists=True, dir_okay=False, file_okay=True),
     show_default=True,
-    default=CONFIG[PRINTER_CONFIG_SECTION].get("executable_path", EXECUTABLE_PATH),
+    default=CONFIG[CRON_CONFIG_SECTION].get("executable_path", EXECUTABLE_PATH),
 )
 @click.option(
     "--default-log-level",
@@ -273,14 +284,32 @@ def svo_print():
     default="error",
     type=click.Choice(["error", "info", "debug"]),
 )
+@click.option(
+    "--us-letter-printer",
+    help="printer to use for us-letter size",
+    required=True,
+    prompt=True,
+    type=click.Choice(_get_available_printers()),
+    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("us_letter", None)
+
+)
+@click.option(
+    "--label-printer",
+    help="printer to use for labels",
+    required=True,
+    prompt=True,
+    type=click.Choice(_get_available_printers()),
+    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("label", None)
+)
 def setup(
     access_key,
     secret_access_key,
     region,
-    store_id,
-    printer_name,
+    queue_name,
     executable_path,
     default_log_level,
+    us_letter_printer,
+    label_printer
 ):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
@@ -290,10 +319,10 @@ def setup(
         access_key=access_key,
         secret_access_key=secret_access_key,
         region=region,
-        store_id=store_id,
-        printer_name=printer_name,
+        queue_name=queue_name,
         executable_path=executable_path,
         default_log_level=default_log_level,
+        printers = {"us_letter": us_letter_printer, "label": label_printer}
     )
     config = _generate_config(config_vals)
     _schedule(config)
