@@ -20,32 +20,14 @@ The `deploy.sh` creates a wheel file in the `svo-print-config` s3 bucket to be i
 There's also a cloudformation template that will setup the lambda, sqs, and s3 triggers.
 
 ## End User Installation Options
-First, have the user go to https://www.python.org/downloads/ and install python. This is bundled in a mac osx
-installer, and went smoothly on my 8 year old mac running 10.6.8.
+### Scripted Installation
 
-
-The end user should be able to fill out a form in the web app that generates a
-signed URL for download access to the `svo_print-config/svo_print-[version+python-version]-any.whl` see
-[aws docs ruby signed url](https://docs.aws.amazon.com/AmazonS3/latest/dev/UploadObjectPreSignedURLRubySDK.html)
-
-After they have the .whl (wheel) file, they can run
-`pip2.7 install [the file].whl` in terminal.
-
-After that succeeds, there should be a new binary `svo-print`. Test by typing `svo-print` in a terminal.
-
-If that works, let's get a list of printers available printers with: `svo-print setup --help`
-
-Look for the `--printer-name` field. There should be a `|` separated list of available printers.
-
-Once you have that, you can go through the wizard with `sudo svo-print setup`.
-
-The web app _could_ produce a command that could be copy pasted into a terminal.
-It would look something like the following.
-
+1. Have the user verify that `pip2.7` exists with `pip2.7 -V`
+2.  Have them run the following.
 ```bash
 # assuming user ran `sudo su` to get a true root terminal first...
 pushd / && \
-curl "https://aws-signed-url-to-svo-.whl" -o ~/svo-print.whl && \
+curl "https://aws-signed-url-to-svo-py2.whl" -o ~/svo-print.whl && \
 pip2.7 install svo-print.whl && \
 svo-print setup \
     --access-key="AKIAJUNJIN5FPYVGHHTA" \
@@ -55,40 +37,13 @@ svo-print setup \
     --default-log-level="info"
 popd
 ```
-
-This provides most of the config options, but the printer config options will need to be filled in by the user when prompted.
-The cli should list the available printers to choose from, e.g.,
-
-```bash
-$ svo-print setup \
-    --access-key="AKIAJUNJIN5FPYVGHHTA" \
-    --secret-access-key="YcJexWW6tmZTsktk7oXWPssIqsz6jpaMMhn3NXcX" \
-    --region="us-east-1" \
-    --queue-name="test-svo-print-store" \
-    --default-log-level="info"
-Executable path [/home/kirk/wokspace/svo-print/svo_print.py]:
-Us letter printer (HP_ENVY_5540_series) [HP_ENVY_5540_series]:
-Label printer (HP_ENVY_5540_series) [HP_ENVY_5540_series]:
+3. The user will be prompted to fill in some variables. The execuatble path can use the default. The two printer options are what they need to fill in for the two types (us_letter and label). E.g.
 ```
-
+Executable path [/home/kirk/wokspace/svo-print/svo_print.py]:
+Us letter printer (HP_ENVY_5540_series): HP_ENVY_5540_series
+Label printer (HP_ENVY_5540_series): HP_ENVY_5540_series
+```
 Note the `Us letter printer` and `Label printer` options. I only have one printer on the my network, so the choice is that listed in ().
-
-There are several ways to handle the access key stuff. The first few that come to mind are:
-
-1. Create store id users in the cloudformation template, and have the
-   web app generate access keys on each request to setup the print (access the form).
-   If creds are compromised, you just revoke them in the console and
-   email the user (or remote in) and have them re-submit the form to
-   generate the access keys. Also, you wouldn't have to store the secret
-   key in the web app which is nice.
-2. Basically #1, but the web app also has the ability to create users
-   if they don't exist already.
-3. Use something like Cognito, or other federation service to allow users from
-   other systems (LDAP, Google, etc) to assume a role that has the ability the
-   store users would have. This is best practice, but is probably overkill.
-4. Have the form the user submits send a notification to an admin that can
-   manually create all this stuff, and send them an email with what to run and
-   how to get going.
 
 ## Additional notes
 
@@ -102,13 +57,13 @@ that looks like
 {
   "html": "<!DOCTYPE html><html><head><title>HTML doc</title></head><body>Content<body></html>",
   "bucket": "svo-print",
-  "key": "test-svo-print-store/test.pdf"
+  "key": "test-svo-print-store/us_letter/test.pdf"
 }
 ```
 * html: is a rendered html page to be printed
 * bucket: the svo-print bucket where the pdf will be stored.
-* key: the s3 key where the pdf will be stored. The prefix should be the store id
-  and the filename should be unique (timestamps work well).
+* key: the s3 key where the pdf will be stored. The prefix should be the store id and the filename should be unique (timestamps work well).
+Also, the file needs to be under one of the following keys depending on printer config type: `us_letter`, `label`
 
 You could get the function name from calling cloudformation,
 or read the value from a config file,

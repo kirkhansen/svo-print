@@ -2,7 +2,7 @@
 
 set -e
 
-AWS_PROFILE=${1:-svo}
+AWS_PROFILE=${1:default}
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 read -p "You're about to deploy to production with the profile ${AWS_PROFILE}! Continue? [n\Y] "

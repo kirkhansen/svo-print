@@ -276,7 +276,7 @@ def svo_print():
     prompt=True,
     type=click.Path(exists=True, dir_okay=False, file_okay=True),
     show_default=True,
-    default=CONFIG[CRON_CONFIG_SECTION].get("executable_path", EXECUTABLE_PATH),
+    default=EXECUTABLE_PATH,
 )
 @click.option(
     "--default-log-level",
