@@ -4,7 +4,6 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
-import configparser
 import tempfile
 import subprocess
 from pathlib import Path
@@ -72,16 +71,20 @@ LOGGER = setup_logging(__name__)
 
 
 def _get_config():
-    config_file =  Path(CONFIG_FILE)
+    config_file = Path(CONFIG_FILE)
     if not config_file.parent.exists():
         config_file.parent.mkdir(parents=True)
     if not config_file.exists():
         config_dict = {}
-    else: 
+    else:
         with config_file.open() as f:
             config_dict = json.load(f)
 
-    for section in [AWS_CONFIG_SECTION, CRON_CONFIG_SECTION, CONFIGURED_PRINTERS_SECTION]:
+    for section in [
+        AWS_CONFIG_SECTION,
+        CRON_CONFIG_SECTION,
+        CONFIGURED_PRINTERS_SECTION,
+    ]:
         if section not in config_dict:
             config_dict[section] = {}
 
@@ -176,14 +179,7 @@ def _schedule(config):
 def _print_file(file_to_print, printer_name):
     """ Send the job to the printer. This assumes Mac or Unix like system where lpr exists."""
     subprocess.check_call(
-        [
-            "lp",
-            "-d",
-            printer_name,
-            "-o",
-            "fit-to-page",
-            file_to_print,
-        ]
+        ["lp", "-d", printer_name, "-o", "fit-to-page", file_to_print,]
     )
 
 
@@ -204,6 +200,7 @@ def _jobs():
                 )
                 yield message, s3_record
 
+
 def _download_file(s3, message, job):
     file_to_print, printer_config = None, None
     try:
@@ -218,9 +215,14 @@ def _download_file(s3, message, job):
     except OSError:
         # This appears to happen when trying to download a dir key instead of a single object.
         # Delete the message
-        LOGGER.warning("Looks like we tried to download a directory; message will be deleted. Key was {}".format(job["key"]))
+        LOGGER.warning(
+            "Looks like we tried to download a directory; message will be deleted. Key was {}".format(
+                job["key"]
+            )
+        )
         message.delete()
     return str(file_to_print), str(printer_config)
+
 
 def _send_jobs_to_printer(s3):
     """ Loops through the queue messages, and attempts to download the pdf object, and send it to the printer(s). """
@@ -228,13 +230,20 @@ def _send_jobs_to_printer(s3):
         file_to_print, printer_config = _download_file(s3, message, job)
         if file_to_print and printer_config in CONFIG[CONFIGURED_PRINTERS_SECTION]:
             try:
-                _print_file(file_to_print, CONFIG[CONFIGURED_PRINTERS_SECTION][printer_config])
+                _print_file(
+                    file_to_print, CONFIG[CONFIGURED_PRINTERS_SECTION][printer_config]
+                )
             except Exception:
                 LOGGER.exception("Error sending jobs to printer")
             else:
                 message.delete()
         else:
-            LOGGER.warning("file_to_print was empty or Printer config {} doesn't exist in CONFIG".format(printer_config))
+            LOGGER.warning(
+                "file_to_print was empty or Printer config {} doesn't exist in CONFIG".format(
+                    printer_config
+                )
+            )
+
 
 @click.group()
 def svo_print():
@@ -290,8 +299,7 @@ def svo_print():
     required=True,
     prompt=True,
     type=click.Choice(_get_available_printers()),
-    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("us_letter", None)
-
+    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("us_letter", None),
 )
 @click.option(
     "--label-printer",
@@ -299,7 +307,7 @@ def svo_print():
     required=True,
     prompt=True,
     type=click.Choice(_get_available_printers()),
-    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("label", None)
+    default=CONFIG[CONFIGURED_PRINTERS_SECTION].get("label", None),
 )
 def setup(
     access_key,
@@ -309,7 +317,7 @@ def setup(
     executable_path,
     default_log_level,
     us_letter_printer,
-    label_printer
+    label_printer,
 ):
     """
     Setup the printing application. You may pass in the variables from the commandline directly, or
@@ -322,7 +330,7 @@ def setup(
         queue_name=queue_name,
         executable_path=executable_path,
         default_log_level=default_log_level,
-        printers = {"us_letter": us_letter_printer, "label": label_printer}
+        printers={"us_letter": us_letter_printer, "label": label_printer},
     )
     config = _generate_config(config_vals)
     _schedule(config)

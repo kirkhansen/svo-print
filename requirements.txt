@@ -1,6 +1,5 @@
 click
 boto3
 python-crontab
-configparser
 pathlib
 six

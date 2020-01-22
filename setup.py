@@ -5,7 +5,6 @@ install_requires = [
     "boto3",
     "botocore",
     "python-crontab",
-    "configparser",
     "pathlib",
     "six",
 ]
