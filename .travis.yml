@@ -1,0 +1,11 @@
+language: python
+python:
+  - "2.7.10"
+
+install:
+  - pip install -r requirements.txt
+
+script: svo-print --help
+
+os: osx
+osx_image: xcode6.4
