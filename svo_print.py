@@ -46,6 +46,9 @@ CLI_INFO = "blue"
 
 ENV_VARS_TO_PASS_TO_COMMAND = {"LC_CTYPE", "LOG_FILE", "LOG_LEVEL"}
 
+if not Path(click.get_app_dir(APP_NAME)).exists():
+    Path(click.get_app_dir(APP_NAME)).mkdir()
+
 
 def setup_logging(
     name, default_level="error", env_log_file="LOG_FILE", env_log_level="LOG_LEVEL"
@@ -153,13 +156,14 @@ def _schedule(config):
     on workdays between 7am and 9pm
     """
     crontab = CronTab(user=getpass.getuser())
-    cmd = "{} {} {} {}".format(
+    cmd = "{} {} {} {} {}".format(
         " ".join(
             "{}={}".format(key, value)
             for key, value in os.environ.items()
             if key in ENV_VARS_TO_PASS_TO_COMMAND
         ),
         "LOG_LEVEL={}".format(config[CRON_CONFIG_SECTION]["default_log_level"]),
+        "/usr/bin/env python2",
         config[CRON_CONFIG_SECTION]["executable_path"],
         config[CRON_CONFIG_SECTION]["cmd"],
     )
