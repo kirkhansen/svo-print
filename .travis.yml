@@ -1,10 +1,8 @@
-language: python
-python:
-  - "2.7"
+language: generic
 
 install:
   - ./build.sh
-  - pip install dist/svo_print*.whl
+  - pip2 install dist/svo_print*.whl
 
 script: svo-print --help
 
