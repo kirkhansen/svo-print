@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/kirkhansen/svo-print.svg?branch=master)](https://travis-ci.org/kirkhansen/svo-print)
+
 ## Installation
 1. `git clone git@github.com:kirkhansen/svo-print.git`
 2. `workon your-new-virtualenv`
