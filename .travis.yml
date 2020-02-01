@@ -3,9 +3,10 @@ python:
   - "2.7"
 
 install:
-  - pip install -r requirements.txt
+  - ./build.sh
+  - pip install dist/svo_print*.whl
 
 script: svo-print --help
 
 os: osx
-osx_image: xcode6.4
+osx_image: xcode7.3
