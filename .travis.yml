@@ -1,6 +1,7 @@
 jobs:
   include:
     - name: "Python: 2.7"
+      env: PYTHON_VERSION=python2
       os: osx
       osx_image: xcode7.3
       language: generic
@@ -9,6 +10,7 @@ jobs:
         - ./build.sh
         - pip2 install dist/svo_print*.whl
     - name: "Python: 3.7"
+      env: PYTHON_VERSION=python3
       os: osx
       osx_image: xcode10.2
       language: generic

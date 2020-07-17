@@ -10,7 +10,7 @@ echo
 if [[ ${REPLY} =~ ^[Yy]$ ]]
 then
     # make sure we have the latest python code built, and npm code for lambda is up to date
-    ./build.sh
+    ./build_python2.sh
 
     # Update the cli code.
     aws --profile=${AWS_PROFILE} s3 cp --recursive --include="*.whl" "${DIR}/dist/" s3://svo-print-config/
