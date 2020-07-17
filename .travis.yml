@@ -8,7 +8,6 @@ jobs:
       install:
         - ./build.sh
         - pip2 install dist/svo_print*.whl
-      script: svo-print --help
     - name: "Python: 3.7"
       os: osx
       osx_image: xcode10.2
@@ -16,4 +15,4 @@ jobs:
       install:
         - ./build.sh
         - pip3 install dist/svo_print*.whl
-      script: svo-print --help
+script: svo-print --help
