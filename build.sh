@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-
 set -e
 
-python2 setup.py bdist_wheel
+PYTHON_VERSION=${PYTHON_VERSION:=python2}
+
+${PYTHON_VERSION} setup.py bdist_wheel
 
 pushd html-to-pdf
 npm install

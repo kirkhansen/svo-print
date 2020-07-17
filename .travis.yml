@@ -1,10 +1,20 @@
-language: generic
-
-install:
-  - ./build.sh
-  - pip2 install dist/svo_print*.whl
-
+jobs:
+  include:
+    - name: "Python: 2.7"
+      env: PYTHON_VERSION=python2
+      os: osx
+      osx_image: xcode7.3
+      language: generic
+      python: 2.7
+      install:
+        - ./build.sh
+        - pip2 install dist/svo_print*.whl
+    - name: "Python: 3.7"
+      env: PYTHON_VERSION=python3
+      os: osx
+      osx_image: xcode10.2
+      language: generic
+      install:
+        - ./build.sh
+        - pip3 install dist/svo_print*.whl
 script: svo-print --help
-
-os: osx
-osx_image: xcode7.3
